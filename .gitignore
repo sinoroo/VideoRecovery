@@ -1,0 +1,27 @@
+## .NET / VS
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+## Build / test output
+[Dd]ebug/
+[Rr]elease/
+TestResults/
+ui-artifacts/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+
+## Logs
+logs/
+*.log
+
+## Rider / VS Code (keep shared settings if any)
+.idea/
+
+## OS
+Thumbs.db
+.DS_Store

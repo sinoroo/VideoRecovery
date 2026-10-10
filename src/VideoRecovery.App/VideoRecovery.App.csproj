@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\VideoRecovery.Core\VideoRecovery.Core.csproj" />
+    <ProjectReference Include="..\VideoRecovery.Infrastructure\VideoRecovery.Infrastructure.csproj" />
+    <ProjectReference Include="..\VideoRecovery.Scanner\VideoRecovery.Scanner.csproj" />
+    <ProjectReference Include="..\VideoRecovery.Analysis\VideoRecovery.Analysis.csproj" />
+    <ProjectReference Include="..\VideoRecovery.CrossMatch\VideoRecovery.CrossMatch.csproj" />
+    <ProjectReference Include="..\VideoRecovery.Recovery\VideoRecovery.Recovery.csproj" />
+    <ProjectReference Include="..\VideoRecovery.AI\VideoRecovery.AI.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>VideoRecovery.App</RootNamespace>
+    <AssemblyName>VideoRecovery.App</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="MaterialDesignThemes" Version="4.9.0" />
+    <PackageReference Include="MaterialDesignColors" Version="2.1.4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Serilog" Version="4.0.2" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="config\ffmpeg_config.ini">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

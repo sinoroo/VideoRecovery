@@ -1,0 +1,13 @@
+<Project>
+
+  <!-- VideoRecovery 솔루션 전역 빌드 설정 (WiloNutrientSystem 규칙과 동일) -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+</Project>
