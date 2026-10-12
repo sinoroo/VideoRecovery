@@ -1,13 +1,13 @@
 namespace VideoRecovery.Core.Abstractions.CrossMatch;
 
 /// <summary>
-/// 프레임 특징 추출/비교. (요구사항 6 - 2단계 Feature comparison)
-/// pHash/Histogram/Feature 등 저수준 특징은 Infrastructure(OpenCV) 구현에 위임한다.
+/// 프레임 특징 추출기. 프레임 바이트에서 비교용 특징(pHash/히스토그램 등)을 만든다.
 /// </summary>
 public interface IFeatureMatcher
 {
-    /// <summary>
-    /// 두 프레임 이미지 경로의 특징 유사도를 0.0~1.0 으로 반환한다.
-    /// </summary>
-    Task<double> CompareAsync(string frameImagePathA, string frameImagePathB, CancellationToken cancellationToken = default);
+    /// <summary>프레임 이미지 바이트에서 perceptual hash(64-bit)를 계산한다.</summary>
+    ulong ComputePerceptualHash(byte[] frameImage);
+
+    /// <summary>두 perceptual hash의 유사도(0.0 ~ 1.0)를 반환한다.</summary>
+    double HashSimilarity(ulong a, ulong b);
 }

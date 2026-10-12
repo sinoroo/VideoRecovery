@@ -1,6 +1,6 @@
 <Project>
 
-  <!-- VideoRecovery 솔루션 전역 빌드 설정 (WiloNutrientSystem 규칙과 동일) -->
+  <!-- VideoRecovery 솔루션 전역 빌드 설정 -->
   <PropertyGroup>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>

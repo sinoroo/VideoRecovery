@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using VideoRecovery.Core.Abstractions.Infrastructure;
 using VideoRecovery.Core.Abstractions.Scanner;
@@ -7,72 +6,47 @@ using VideoRecovery.Core.Models;
 namespace VideoRecovery.Scanner;
 
 /// <summary>
-/// <see cref="IVideoStorageScanner"/> 의 기본 구현. 파일 열거 + ffprobe 메타데이터 수집. (요구사항 3.1)
-/// Scanner Agent. 원본은 읽기 전용으로만 접근한다. (요구사항 16, 17-1)
+/// 폴더/HDD를 스캔하여 영상 파일 기본 정보를 수집하는 <see cref="IVideoStorageScanner"/> 구현.
+/// 원본은 변경하지 않으며, 파일 시스템 접근은 <see cref="IFileSystemService"/>로 추상화한다.
 /// </summary>
 public sealed class VideoStorageScanner : IVideoStorageScanner
 {
     private readonly IFileSystemService _fileSystem;
-    private readonly IFFprobeService _ffprobe;
     private readonly ILogger<VideoStorageScanner> _logger;
 
-    public VideoStorageScanner(
-        IFileSystemService fileSystem,
-        IFFprobeService ffprobe,
-        ILogger<VideoStorageScanner> logger)
+    public VideoStorageScanner(IFileSystemService fileSystem, ILogger<VideoStorageScanner> logger)
     {
         _fileSystem = fileSystem;
-        _ffprobe = ffprobe;
         _logger = logger;
     }
 
-    /// <inheritdoc />
-    public async IAsyncEnumerable<VideoFileInfo> ScanAsync(
-        string root,
-        IProgress<double>? progress = null,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<VideoFileInfo>> ScanAsync(
+        string rootDirectory,
+        bool recursive = true,
+        IProgress<VideoFileInfo>? progress = null,
+        CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Scan started: {Root}", root);
-
-        var paths = _fileSystem.EnumerateVideoFiles(root).ToList();
-        var total = paths.Count;
-        var done = 0;
-
-        foreach (var path in paths)
+        return Task.Run<IReadOnlyList<VideoFileInfo>>(() =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            var results = new List<VideoFileInfo>();
 
-            var fileInfo = new FileInfo(path);
-            var info = new VideoFileInfo
+            if (!_fileSystem.DirectoryExists(rootDirectory))
             {
-                FilePath = path,
-                FileName = fileInfo.Name,
-                SizeBytes = fileInfo.Length,
-                CreatedAt = fileInfo.CreationTimeUtc,
-                ModifiedAt = fileInfo.LastWriteTimeUtc,
-            };
-
-            // 메타데이터 수집은 손상 파일에서 실패할 수 있으므로 격리하여 계속 진행한다.
-            try
-            {
-                info.Metadata = await _ffprobe.ProbeAsync(path, cancellationToken).ConfigureAwait(false);
-            }
-            catch (NotImplementedException)
-            {
-                // Phase 1 구현 전까지는 메타데이터 없이 파일 정보만 반환한다.
-                _logger.LogDebug("Probe not implemented yet for {Path}", path);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Probe failed for {Path}; file may be corrupted", path);
+                _logger.LogWarning("스캔 대상 폴더가 존재하지 않음: {Root}", rootDirectory);
+                return results;
             }
 
-            done++;
-            progress?.Report(total == 0 ? 1.0 : (double)done / total);
+            _logger.LogInformation("저장소 스캔 시작: {Root} (recursive={Recursive})", rootDirectory, recursive);
 
-            yield return info;
-        }
+            foreach (var file in _fileSystem.EnumerateVideos(rootDirectory, recursive))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                results.Add(file);
+                progress?.Report(file);
+            }
 
-        _logger.LogInformation("Scan completed: {Count} files", total);
+            _logger.LogInformation("저장소 스캔 완료: {Count}개 영상 발견", results.Count);
+            return results;
+        }, cancellationToken);
     }
 }

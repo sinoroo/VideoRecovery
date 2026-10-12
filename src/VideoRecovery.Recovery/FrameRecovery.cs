@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-using VideoRecovery.Core.Abstractions.Infrastructure;
 using VideoRecovery.Core.Abstractions.Recovery;
 using VideoRecovery.Core.Enums;
 using VideoRecovery.Core.Models;
@@ -7,39 +5,25 @@ using VideoRecovery.Core.Models;
 namespace VideoRecovery.Recovery;
 
 /// <summary>
-/// Level 2 — Frame Recovery. 정상 프레임 보존, 손상 프레임 제거/재정렬/보간. (요구사항 8 Level 2)
-/// TODO(Phase 2): 손상 프레임 제거 + Timestamp 재정렬 구현.
+/// Level 2 복구 — 손상 프레임 제거/보간 및 타임스탬프 재정렬.
+/// Phase 2에서 ffmpeg 기반 프레임 추출/재조립으로 구현한다.
 /// </summary>
 public sealed class FrameRecovery : IFrameRecovery
 {
-    private const CorruptionType Handled =
-        CorruptionType.MissingFrame | CorruptionType.DecodeError |
-        CorruptionType.CorruptedFrame | CorruptionType.DuplicateFrame |
-        CorruptionType.FrameOrderError;
-
-    private readonly IFFmpegService _ffmpeg;
-    private readonly ILogger<FrameRecovery> _logger;
-
-    public FrameRecovery(IFFmpegService ffmpeg, ILogger<FrameRecovery> logger)
-    {
-        _ffmpeg = ffmpeg;
-        _logger = logger;
-    }
-
-    /// <inheritdoc />
     public RecoveryLevel Level => RecoveryLevel.FrameRecovery;
 
-    /// <inheritdoc />
-    public bool CanHandle(CorruptionType corruption) => (corruption & Handled) != CorruptionType.None;
+    public bool CanHandle(CorruptionType types)
+        => (types & (CorruptionType.MissingFrame | CorruptionType.DecodeError
+            | CorruptionType.CorruptedFrame | CorruptionType.DuplicateFrame
+            | CorruptionType.FrameOrderError)) != 0;
 
-    /// <inheritdoc />
-    public Task<RecoveryResult> ExecuteAsync(
-        RecoveryStep step,
-        string sessionDirectory,
+    public Task<RecoveryResult> RecoverAsync(
+        string originalPath,
+        string sessionPath,
+        CorruptionReport corruption,
+        ReferenceCandidate? reference,
         CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation("Frame recovery requested in {Session}", sessionDirectory);
-        throw new NotImplementedException(
-            "FrameRecovery.ExecuteAsync: 프레임 복구를 Phase 2 에서 구현한다.");
-    }
+        // Phase 2: 정상 프레임 보존 → 손상 프레임 제거 → 타임스탬프 재정렬 → 재조립.
+        => throw new NotImplementedException(
+            "Phase 2 — Frame Recovery 미구현: 손상 프레임 제거/보간 로직을 추가해야 합니다.");
 }

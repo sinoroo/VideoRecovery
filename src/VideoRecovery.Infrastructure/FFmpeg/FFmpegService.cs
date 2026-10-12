@@ -1,66 +1,145 @@
-using System.Runtime.CompilerServices;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using VideoRecovery.Core.Abstractions.Infrastructure;
-using VideoRecovery.Core.Models;
 
 namespace VideoRecovery.Infrastructure.FFmpeg;
 
 /// <summary>
-/// ffmpeg CLI 기반 <see cref="IFFmpegService"/> 구현. (요구사항 12)
-/// TODO(Phase 1/2): 디코드 테스트 로그 파싱 및 리먹싱/프레임 추출 구현.
+/// ffmpeg CLI 기반 <see cref="IFFmpegService"/> 구현. 전체 디코드 테스트,
+/// 프레임 추출, 컨테이너 재먹싱을 수행한다. 원본은 절대 수정하지 않는다.
 /// </summary>
-public sealed class FFmpegService : IFFmpegService
+public sealed partial class FFmpegService : IFFmpegService
 {
     private readonly FFmpegOptions _options;
-    private readonly ProcessRunner _runner;
     private readonly ILogger<FFmpegService> _logger;
 
     public FFmpegService(FFmpegOptions options, ILogger<FFmpegService> logger)
     {
         _options = options;
         _logger = logger;
-        _runner = new ProcessRunner(logger);
     }
 
-    /// <inheritdoc />
-    public async IAsyncEnumerable<DecodeSegment> DecodeTestAsync(
-        string filePath,
-        IProgress<double>? progress = null,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DecodeError>> DecodeTestAsync(
+        string path, CancellationToken cancellationToken = default)
     {
-        // 의도된 CLI 호출:
-        //   ffmpeg -v error -i "<filePath>" -f null -
-        // stderr 의 decode error 로그 위치를 프레임 구간으로 변환한다.
-        _logger.LogInformation("Decode test requested for {FilePath}", filePath);
-        await Task.CompletedTask.ConfigureAwait(false);
-        throw new NotImplementedException(
-            "FFmpegService.DecodeTestAsync: 디코드 오류 로그 파싱을 Phase 1 에서 구현한다.");
-#pragma warning disable CS0162 // 도달할 수 없는 코드: async iterator 시그니처 유지를 위한 yield.
-        yield break;
-#pragma warning restore CS0162
+        // 전체 영상을 디코딩만 하고 출력은 버린다(-f null -). 오류는 stderr에 기록된다.
+        var args = $"-v error -hide_banner -xerror -i \"{path}\" -f null -";
+
+        var result = await ProcessRunner
+            .RunAsync(_options.FFmpegPath, args, _options.Timeout, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!result.Started)
+        {
+            _logger.LogWarning("ffmpeg not available: {Error}", result.StandardError);
+            return new[]
+            {
+                new DecodeError { Message = "ffmpeg를 찾을 수 없습니다. FFmpeg 설치 후 프로그램을 재시작하세요." }
+            };
+        }
+
+        return ParseDecodeErrors(result.StandardError);
     }
 
-    /// <inheritdoc />
-    public Task RemuxAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default)
+    public async Task<byte[]> ExtractFrameAsync(
+        string path, long frameIndex, CancellationToken cancellationToken = default)
     {
-        // 의도된 CLI 호출: ffmpeg -i "<source>" -c copy "<destination>"
-        _logger.LogInformation("Remux requested {Source} -> {Destination}", sourcePath, destinationPath);
-        throw new NotImplementedException(
-            "FFmpegService.RemuxAsync: 컨테이너 리먹싱을 Phase 2 에서 구현한다.");
+        var temp = Path.Combine(Path.GetTempPath(), $"vr_frame_{Guid.NewGuid():N}.png");
+        try
+        {
+            // 지정 프레임만 선택하여 PNG로 추출.
+            var args =
+                $"-v error -hide_banner -i \"{path}\" " +
+                $"-vf \"select=eq(n\\,{frameIndex})\" -frames:v 1 -y \"{temp}\"";
+
+            var result = await ProcessRunner
+                .RunAsync(_options.FFmpegPath, args, _options.Timeout, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (result.Started && result.ExitCode == 0 && File.Exists(temp))
+            {
+                return await File.ReadAllBytesAsync(temp, cancellationToken).ConfigureAwait(false);
+            }
+
+            return Array.Empty<byte>();
+        }
+        finally
+        {
+            TryDelete(temp);
+        }
     }
 
-    /// <inheritdoc />
-    public Task ExtractFramesAsync(
-        string filePath,
-        long startFrame,
-        long endFrame,
-        string outputDirectory,
-        CancellationToken cancellationToken = default)
+    public async Task<bool> RemuxAsync(
+        string inputPath, string outputPath, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation(
-            "Extract frames requested {FilePath} [{Start}-{End}] -> {Output}",
-            filePath, startFrame, endFrame, outputDirectory);
-        throw new NotImplementedException(
-            "FFmpegService.ExtractFramesAsync: 프레임 추출을 Phase 2 에서 구현한다.");
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+
+        // 스트림 복사로 컨테이너만 재구성(재인코딩 없음) → 인덱스/타임스탬프 복구.
+        var args =
+            $"-v error -hide_banner -err_detect ignore_err -i \"{inputPath}\" " +
+            $"-c copy -movflags +faststart -y \"{outputPath}\"";
+
+        var result = await ProcessRunner
+            .RunAsync(_options.FFmpegPath, args, _options.Timeout, cancellationToken)
+            .ConfigureAwait(false);
+
+        return result.Started && result.ExitCode == 0 && File.Exists(outputPath);
     }
+
+    /// <summary>ffmpeg stderr에서 디코드 오류 라인을 추출한다.</summary>
+    private static IReadOnlyList<DecodeError> ParseDecodeErrors(string stderr)
+    {
+        var errors = new List<DecodeError>();
+        if (string.IsNullOrWhiteSpace(stderr))
+        {
+            return errors;
+        }
+
+        foreach (var raw in stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0 || !LooksLikeError(line))
+            {
+                continue;
+            }
+
+            double? time = null;
+            var timeMatch = TimeRegex().Match(line);
+            if (timeMatch.Success
+                && double.TryParse(timeMatch.Groups["t"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var t))
+            {
+                time = t;
+            }
+
+            errors.Add(new DecodeError { TimeSeconds = time, Message = line });
+        }
+
+        return errors;
+    }
+
+    private static bool LooksLikeError(string line)
+        => line.Contains("error", StringComparison.OrdinalIgnoreCase)
+           || line.Contains("corrupt", StringComparison.OrdinalIgnoreCase)
+           || line.Contains("invalid", StringComparison.OrdinalIgnoreCase)
+           || line.Contains("missing", StringComparison.OrdinalIgnoreCase)
+           || line.Contains("concealing", StringComparison.OrdinalIgnoreCase);
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+            // 무시 — 임시 파일 정리.
+        }
+    }
+
+    [GeneratedRegex(@"t:\s*(?<t>[0-9]+(\.[0-9]+)?)", RegexOptions.IgnoreCase)]
+    private static partial Regex TimeRegex();
 }

@@ -1,16 +1,11 @@
+using VideoRecovery.Core.Models;
+
 namespace VideoRecovery.Core.Abstractions.AI;
 
-/// <summary>
-/// 초해상(Super Resolution). 영상 품질을 최대한 복원한다. (요구사항 8 Level 4)
-/// </summary>
+/// <summary>AI 초해상(Super Resolution) 품질 복원. 후속 단계 구현.</summary>
 public interface ISuperResolution
 {
-    /// <summary>
-    /// 입력 이미지를 <paramref name="scale"/> 배로 업스케일한 결과 경로를 반환한다.
-    /// </summary>
-    Task<string> UpscaleAsync(
-        string inputImagePath,
-        int scale,
-        string outputDirectory,
-        CancellationToken cancellationToken = default);
+    /// <summary>해상도/품질을 AI로 복원한다.</summary>
+    Task<RecoveryResult> UpscaleAsync(
+        AiRecoveryRequest request, CancellationToken cancellationToken = default);
 }

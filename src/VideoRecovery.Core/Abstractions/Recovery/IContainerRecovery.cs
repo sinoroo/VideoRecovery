@@ -1,9 +1,4 @@
 namespace VideoRecovery.Core.Abstractions.Recovery;
 
-/// <summary>
-/// Level 1 — Container Recovery. 가장 안전한 복구.
-/// Container/Index/Metadata/Timestamp/Stream 재구성. (요구사항 8 Level 1)
-/// </summary>
-public interface IContainerRecovery : IRecoveryStrategy
-{
-}
+/// <summary>Level 1 — 컨테이너/인덱스/메타데이터/타임스탬프 복구 전략 마커.</summary>
+public interface IContainerRecovery : IRecoveryStrategy;

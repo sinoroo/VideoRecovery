@@ -7,38 +7,68 @@ using VideoRecovery.Core.Models;
 namespace VideoRecovery.Recovery;
 
 /// <summary>
-/// Level 1 — Container Recovery. Container/Index/Metadata/Timestamp 재구성. (요구사항 8 Level 1)
-/// TODO(Phase 2): ffmpeg 리먹싱 기반 컨테이너 복구 구현.
+/// Level 1 복구 — 컨테이너/인덱스/메타데이터/타임스탬프 재구성. 스트림 복사 재먹싱으로
+/// 가장 안전하게 복구한다(재인코딩 없음). 원본은 보존되고 결과는 작업 영역에 생성된다.
 /// </summary>
 public sealed class ContainerRecovery : IContainerRecovery
 {
-    private const CorruptionType Handled =
-        CorruptionType.ContainerCorruption | CorruptionType.IndexCorruption |
-        CorruptionType.MetadataCorruption | CorruptionType.TimestampCorruption;
-
     private readonly IFFmpegService _ffmpeg;
+    private readonly IWorkspaceManager _workspace;
     private readonly ILogger<ContainerRecovery> _logger;
 
-    public ContainerRecovery(IFFmpegService ffmpeg, ILogger<ContainerRecovery> logger)
+    public ContainerRecovery(
+        IFFmpegService ffmpeg, IWorkspaceManager workspace, ILogger<ContainerRecovery> logger)
     {
         _ffmpeg = ffmpeg;
+        _workspace = workspace;
         _logger = logger;
     }
 
-    /// <inheritdoc />
     public RecoveryLevel Level => RecoveryLevel.ContainerRecovery;
 
-    /// <inheritdoc />
-    public bool CanHandle(CorruptionType corruption) => (corruption & Handled) != CorruptionType.None;
+    public bool CanHandle(CorruptionType types)
+        => (types & (CorruptionType.ContainerCorruption | CorruptionType.IndexCorruption
+            | CorruptionType.MetadataCorruption | CorruptionType.TimestampCorruption)) != 0;
 
-    /// <inheritdoc />
-    public Task<RecoveryResult> ExecuteAsync(
-        RecoveryStep step,
-        string sessionDirectory,
+    public async Task<RecoveryResult> RecoverAsync(
+        string originalPath,
+        string sessionPath,
+        CorruptionReport corruption,
+        ReferenceCandidate? reference,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Container recovery requested in {Session}", sessionDirectory);
-        throw new NotImplementedException(
-            "ContainerRecovery.ExecuteAsync: 리먹싱 기반 컨테이너 복구를 Phase 2 에서 구현한다.");
+        var log = new List<string>();
+        var outputName = $"{Path.GetFileNameWithoutExtension(originalPath)}_recovered.mp4";
+        var outputPath = _workspace.GetArtifactPath(sessionPath, outputName);
+
+        log.Add($"컨테이너 재먹싱 시작: {Path.GetFileName(originalPath)} → {outputName}");
+        _logger.LogInformation("Container recovery: {Original} → {Output}", originalPath, outputPath);
+
+        var ok = await _ffmpeg.RemuxAsync(originalPath, outputPath, cancellationToken).ConfigureAwait(false);
+
+        if (ok)
+        {
+            log.Add("재먹싱 성공(스트림 복사).");
+            return new RecoveryResult
+            {
+                OriginalPath = originalPath,
+                RecoveredPath = outputPath,
+                AppliedLevel = Level,
+                Succeeded = true,
+                Confidence = 0.8,
+                Log = log
+            };
+        }
+
+        log.Add("재먹싱 실패.");
+        return new RecoveryResult
+        {
+            OriginalPath = originalPath,
+            AppliedLevel = Level,
+            Succeeded = false,
+            Confidence = 0,
+            Log = log,
+            Error = "ffmpeg 재먹싱 실패(바이너리 미설치 또는 복구 불가)"
+        };
     }
 }

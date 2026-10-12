@@ -1,56 +1,85 @@
-using Microsoft.Extensions.Logging;
 using VideoRecovery.Core.Abstractions.CrossMatch;
+using VideoRecovery.Core.Models;
 
 namespace VideoRecovery.CrossMatch;
 
 /// <summary>
-/// 시각 유사도 계산 엔진(2단계). pHash/Histogram/SSIM. (요구사항 6)
-/// pHash/Histogram 은 순수 계산이므로 기본 구현을 제공하고, SSIM 은 OpenCV 에 위임한다.
+/// 유사도 엔진. 메타데이터 특성 유사도와 특징 벡터(히스토그램 등) 유사도를 산출한다.
 /// </summary>
 public sealed class SimilarityEngine : ISimilarityEngine
 {
-    private readonly ILogger<SimilarityEngine> _logger;
-
-    public SimilarityEngine(ILogger<SimilarityEngine> logger) => _logger = logger;
-
-    /// <inheritdoc />
-    public double PerceptualHashSimilarity(ulong hashA, ulong hashB)
+    public double MetadataSimilarity(VideoMetadata a, VideoMetadata b)
     {
-        // 해밍 거리를 0.0~1.0 유사도로 변환 (64비트 pHash 기준).
-        var distance = System.Numerics.BitOperations.PopCount(hashA ^ hashB);
-        return 1.0 - (distance / 64.0);
+        if (a.ProbeFailed || b.ProbeFailed)
+        {
+            return 0;
+        }
+
+        double score = 0;
+        double weight = 0;
+
+        var va = a.PrimaryVideo;
+        var vb = b.PrimaryVideo;
+
+        if (va is not null && vb is not null)
+        {
+            // 코덱 일치(가중 0.35).
+            score += Weighted(string.Equals(va.Codec, vb.Codec, StringComparison.OrdinalIgnoreCase) ? 1 : 0, 0.35, ref weight);
+
+            // 해상도 일치(가중 0.30).
+            var resMatch = va.Width == vb.Width && va.Height == vb.Height ? 1 : 0;
+            score += Weighted(resMatch, 0.30, ref weight);
+
+            // FPS 근접(가중 0.20).
+            score += Weighted(Closeness(va.Fps, vb.Fps, 1.0), 0.20, ref weight);
+        }
+
+        // 포맷 이름 일치(가중 0.15).
+        score += Weighted(string.Equals(a.FormatName, b.FormatName, StringComparison.OrdinalIgnoreCase) ? 1 : 0, 0.15, ref weight);
+
+        return weight > 0 ? score / weight : 0;
     }
 
-    /// <inheritdoc />
-    public double HistogramSimilarity(IReadOnlyList<double> histogramA, IReadOnlyList<double> histogramB)
+    public double VisualSimilarity(IReadOnlyList<double> a, IReadOnlyList<double> b)
     {
-        if (histogramA.Count == 0 || histogramA.Count != histogramB.Count)
+        if (a.Count == 0 || b.Count == 0 || a.Count != b.Count)
         {
-            return 0.0;
+            return 0;
         }
 
-        // 코사인 유사도 기반 히스토그램 상관도.
-        double dot = 0, normA = 0, normB = 0;
-        for (var i = 0; i < histogramA.Count; i++)
+        // 코사인 유사도.
+        double dot = 0, na = 0, nb = 0;
+        for (var i = 0; i < a.Count; i++)
         {
-            dot += histogramA[i] * histogramB[i];
-            normA += histogramA[i] * histogramA[i];
-            normB += histogramB[i] * histogramB[i];
+            dot += a[i] * b[i];
+            na += a[i] * a[i];
+            nb += b[i] * b[i];
         }
 
-        if (normA == 0 || normB == 0)
+        if (na == 0 || nb == 0)
         {
-            return 0.0;
+            return 0;
         }
 
-        return dot / (Math.Sqrt(normA) * Math.Sqrt(normB));
+        var cos = dot / (Math.Sqrt(na) * Math.Sqrt(nb));
+        return Math.Clamp(cos, 0, 1);
     }
 
-    /// <inheritdoc />
-    public Task<double> StructuralSimilarityAsync(string imagePathA, string imagePathB, CancellationToken cancellationToken = default)
+    private static double Weighted(double value, double weight, ref double totalWeight)
     {
-        _logger.LogDebug("SSIM requested {A} vs {B}", imagePathA, imagePathB);
-        throw new NotImplementedException(
-            "SimilarityEngine.StructuralSimilarityAsync: SSIM(OpenCV) 계산을 Phase 3 에서 구현한다.");
+        totalWeight += weight;
+        return value * weight;
+    }
+
+    /// <summary>두 값이 tolerance 이내면 1에 가깝고 멀수록 0에 수렴.</summary>
+    private static double Closeness(double a, double b, double tolerance)
+    {
+        if (a <= 0 || b <= 0)
+        {
+            return 0;
+        }
+
+        var diff = Math.Abs(a - b);
+        return diff <= tolerance ? 1 - (diff / (tolerance * 4)) : Math.Max(0, 1 - (diff / (tolerance * 4)));
     }
 }

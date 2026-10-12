@@ -3,17 +3,14 @@ using VideoRecovery.Core.Models;
 namespace VideoRecovery.Core.Abstractions.CrossMatch;
 
 /// <summary>
-/// 영상 간 유사성 분석(저장소 단위). Cross Video Analysis Agent 의 계약. (요구사항 6, 16)
-/// 1단계: 메타데이터 기반 후보 선정.
+/// 영상 간 매칭기. 메타데이터 기반(1단계)으로 손상 영상의 참조 후보를 선정한다.
+/// Cross Video Analysis Agent의 상위 인터페이스.
 /// </summary>
 public interface IVideoMatcher
 {
     /// <summary>
-    /// 손상 영상과 유사한 reference 후보 영상을 메타데이터 기준으로 선정한다.
-    /// (Codec/Resolution/FPS/Bitrate/Camera characteristics)
+    /// 손상 영상의 참조로 사용할 수 있는 후보들을 메타데이터 유사도 순으로 반환한다.
     /// </summary>
-    Task<IReadOnlyList<ReferenceCandidate>> FindCandidatesAsync(
-        VideoFileInfo source,
-        IReadOnlyList<VideoFileInfo> library,
-        CancellationToken cancellationToken = default);
+    IReadOnlyList<ReferenceCandidate> FindCandidates(
+        VideoMetadata target, IEnumerable<VideoMetadata> library);
 }

@@ -1,25 +1,13 @@
-using Microsoft.Extensions.Logging;
 using VideoRecovery.Core.Abstractions.AI;
+using VideoRecovery.Core.Models;
 
 namespace VideoRecovery.AI;
 
-/// <summary>프레임 보간(placeholder). Phase 5 에서 AI 모델 연결. (요구사항 8 Level 4)</summary>
+/// <summary>AI 프레임 보간. Phase 5에서 실제 모델(예: RIFE/FILM)로 구현한다.</summary>
 public sealed class FrameInterpolation : IFrameInterpolation
 {
-    private readonly ILogger<FrameInterpolation> _logger;
-
-    public FrameInterpolation(ILogger<FrameInterpolation> logger) => _logger = logger;
-
-    /// <inheritdoc />
-    public Task<IReadOnlyList<string>> InterpolateAsync(
-        string beforeFrameImagePath,
-        string afterFrameImagePath,
-        int count,
-        string outputDirectory,
-        CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation("Frame interpolation requested ({Count} frames)", count);
-        throw new NotImplementedException(
-            "FrameInterpolation.InterpolateAsync: Phase 5 에서 구현한다.");
-    }
+    public Task<RecoveryResult> InterpolateAsync(
+        AiRecoveryRequest request, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException(
+            "Phase 5 — AI Frame Interpolation 미구현: 추론 모델 연결이 필요합니다.");
 }

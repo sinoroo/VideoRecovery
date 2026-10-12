@@ -2,34 +2,39 @@ using VideoRecovery.Core.Models;
 
 namespace VideoRecovery.Core.Abstractions.Infrastructure;
 
-/// <summary>
-/// ffmpeg CLI 래퍼. 디코드 테스트 및 복구용 트랜스코딩/리먹싱을 수행한다.
-/// 외부 라이브러리는 Infrastructure 계층에서만 추상화한다. (요구사항 12, 17-9)
-/// </summary>
+/// <summary>디코드 테스트 중 보고되는 단일 오류.</summary>
+public sealed class DecodeError
+{
+    /// <summary>오류 발생 프레임(알 수 없으면 null).</summary>
+    public long? FrameIndex { get; init; }
+
+    /// <summary>오류 발생 시각(초, 알 수 없으면 null).</summary>
+    public double? TimeSeconds { get; init; }
+
+    /// <summary>ffmpeg가 보고한 원본 메시지.</summary>
+    public string Message { get; init; } = string.Empty;
+}
+
+/// <summary>ffmpeg CLI 추상화. 디코드 테스트/프레임 추출/재먹싱 등을 수행한다.</summary>
 public interface IFFmpegService
 {
     /// <summary>
-    /// 전체 영상을 디코딩하면서 오류 위치를 구간으로 기록한다. (요구사항 4 - Decode Test)
+    /// 전체 영상을 실제 디코딩하며 오류 위치를 수집한다(원본 미변경).
     /// </summary>
-    /// <param name="filePath">원본 파일 경로(읽기 전용).</param>
-    /// <param name="progress">0.0~1.0 진행률 보고(선택).</param>
-    IAsyncEnumerable<DecodeSegment> DecodeTestAsync(
-        string filePath,
-        IProgress<double>? progress = null,
-        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DecodeError>> DecodeTestAsync(
+        string path, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 컨테이너를 재구성(리먹싱)하여 작업 영역에 출력한다. (요구사항 8 Level 1)
+    /// 지정 프레임 인덱스의 썸네일/프레임을 추출하여 바이트로 반환한다.
+    /// 프레임 유사도 분석에 사용된다.
     /// </summary>
-    Task RemuxAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default);
+    Task<byte[]> ExtractFrameAsync(
+        string path, long frameIndex, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 지정한 프레임 범위를 이미지로 추출한다. (프레임 분석/Cross-Video 비교용)
+    /// 컨테이너를 재먹싱(remux)하여 작업 영역에 새 파일을 만든다(스트림 복사).
+    /// 원본은 변경하지 않는다.
     /// </summary>
-    Task ExtractFramesAsync(
-        string filePath,
-        long startFrame,
-        long endFrame,
-        string outputDirectory,
-        CancellationToken cancellationToken = default);
+    Task<bool> RemuxAsync(
+        string inputPath, string outputPath, CancellationToken cancellationToken = default);
 }

@@ -1,15 +1,11 @@
+using VideoRecovery.Core.Models;
+
 namespace VideoRecovery.Core.Abstractions.AI;
 
-/// <summary>
-/// 아티팩트 제거(디노이즈/디블러/블록 제거). (요구사항 8 Level 4)
-/// </summary>
+/// <summary>AI 아티팩트 제거(Denoising/Deblurring/Artifact Removal). 후속 단계 구현.</summary>
 public interface IArtifactRemoval
 {
-    /// <summary>
-    /// 입력 이미지에서 artifact 를 제거한 결과 경로를 반환한다.
-    /// </summary>
-    Task<string> RemoveAsync(
-        string inputImagePath,
-        string outputDirectory,
-        CancellationToken cancellationToken = default);
+    /// <summary>블록 노이즈/번짐 등 아티팩트를 AI로 제거한다.</summary>
+    Task<RecoveryResult> RemoveArtifactsAsync(
+        AiRecoveryRequest request, CancellationToken cancellationToken = default);
 }

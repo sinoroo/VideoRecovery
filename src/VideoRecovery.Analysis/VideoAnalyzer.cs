@@ -6,28 +6,28 @@ using VideoRecovery.Core.Models;
 namespace VideoRecovery.Analysis;
 
 /// <summary>
-/// 컨테이너/비디오 스트림 분석 + 디코드 테스트. Video Analysis Agent. (요구사항 4, 16)
-/// TODO(Phase 1): 디코드 구간 수집 및 심각도 산정 로직 구현.
+/// 컨테이너/비디오 스트림 분석기. ffprobe 메타데이터 수집을 담당한다.
 /// </summary>
 public sealed class VideoAnalyzer : IVideoAnalyzer
 {
-    private readonly IFFmpegService _ffmpeg;
+    private readonly IFFprobeService _ffprobe;
     private readonly ILogger<VideoAnalyzer> _logger;
 
-    public VideoAnalyzer(IFFmpegService ffmpeg, ILogger<VideoAnalyzer> logger)
+    public VideoAnalyzer(IFFprobeService ffprobe, ILogger<VideoAnalyzer> logger)
     {
-        _ffmpeg = ffmpeg;
+        _ffprobe = ffprobe;
         _logger = logger;
     }
 
-    /// <inheritdoc />
-    public Task<HealthReport> AnalyzeAsync(
-        VideoFileInfo file,
-        IProgress<double>? progress = null,
-        CancellationToken cancellationToken = default)
+    public async Task<VideoMetadata> AnalyzeAsync(string path, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Analyze requested for {FilePath}", file.FilePath);
-        throw new NotImplementedException(
-            "VideoAnalyzer.AnalyzeAsync: 디코드 테스트 기반 HealthReport 생성을 Phase 1 에서 구현한다.");
+        var metadata = await _ffprobe.ProbeAsync(path, cancellationToken).ConfigureAwait(false);
+
+        if (metadata.ProbeFailed)
+        {
+            _logger.LogWarning("메타데이터 분석 실패: {Path} ({Error})", path, metadata.ProbeError);
+        }
+
+        return metadata;
     }
 }

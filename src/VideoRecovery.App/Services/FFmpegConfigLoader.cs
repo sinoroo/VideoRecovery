@@ -1,46 +1,51 @@
+using System.Globalization;
 using System.IO;
 using VideoRecovery.Infrastructure.FFmpeg;
 
 namespace VideoRecovery.App.Services;
 
-/// <summary>
-/// 간단한 key=value INI 로더. ffmpeg_config.ini 에서 실행 파일 경로를 읽는다.
-/// 설정은 하드코딩하지 않는다. (요구사항 2.2)
-/// </summary>
+/// <summary>ffmpeg_config.ini를 읽어 <see cref="FFmpegOptions"/>를 구성한다.</summary>
 public static class FFmpegConfigLoader
 {
-    public static FFmpegOptions Load(string iniPath)
+    /// <summary>설정 파일을 읽는다. 없으면 기본값(PATH의 ffmpeg/ffprobe)을 사용한다.</summary>
+    public static FFmpegOptions Load(string path)
     {
         var options = new FFmpegOptions();
-        if (!File.Exists(iniPath))
+        if (!File.Exists(path))
         {
             return options;
         }
 
-        foreach (var raw in File.ReadLines(iniPath))
+        foreach (var raw in File.ReadAllLines(path))
         {
             var line = raw.Trim();
-            if (line.Length == 0 || line.StartsWith('#') || line.StartsWith(';'))
+            if (line.Length == 0 || line.StartsWith(';') || line.StartsWith('#') || line.StartsWith('['))
             {
                 continue;
             }
 
-            var idx = line.IndexOf('=');
-            if (idx <= 0)
+            var sep = line.IndexOf('=');
+            if (sep <= 0)
             {
                 continue;
             }
 
-            var key = line[..idx].Trim();
-            var value = line[(idx + 1)..].Trim();
+            var key = line[..sep].Trim();
+            var value = line[(sep + 1)..].Trim();
 
             switch (key.ToLowerInvariant())
             {
                 case "ffmpegpath":
-                    options.FFmpegPath = value;
+                    if (value.Length > 0) options.FFmpegPath = value;
                     break;
                 case "ffprobepath":
-                    options.FFprobePath = value;
+                    if (value.Length > 0) options.FFprobePath = value;
+                    break;
+                case "timeoutminutes":
+                    if (double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var min) && min > 0)
+                    {
+                        options.Timeout = TimeSpan.FromMinutes(min);
+                    }
                     break;
             }
         }

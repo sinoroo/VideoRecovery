@@ -1,8 +1,6 @@
 namespace VideoRecovery.Core.Enums;
 
-/// <summary>
-/// 스트림 종류.
-/// </summary>
+/// <summary>미디어 스트림 종류.</summary>
 public enum StreamKind
 {
     /// <summary>알 수 없음.</summary>
@@ -18,5 +16,5 @@ public enum StreamKind
     Subtitle = 3,
 
     /// <summary>데이터 스트림.</summary>
-    Data = 4,
+    Data = 4
 }

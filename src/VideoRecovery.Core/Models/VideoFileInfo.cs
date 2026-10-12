@@ -1,14 +1,13 @@
-using VideoRecovery.Core.Enums;
-
 namespace VideoRecovery.Core.Models;
 
 /// <summary>
-/// 저장소 스캔 단계에서 수집하는 영상 파일 기본 정보. (요구사항 3.1)
+/// 스캐너가 수집하는 영상 파일의 기본 정보(디코딩 전).
+/// 원본을 수정하지 않으므로 모든 값은 읽기 전용 스냅샷이다.
 /// </summary>
 public sealed class VideoFileInfo
 {
-    /// <summary>원본 파일의 전체 경로.</summary>
-    public required string FilePath { get; init; }
+    /// <summary>절대 경로.</summary>
+    public required string FullPath { get; init; }
 
     /// <summary>파일명(확장자 포함).</summary>
     public required string FileName { get; init; }
@@ -16,12 +15,12 @@ public sealed class VideoFileInfo
     /// <summary>파일 크기(바이트).</summary>
     public long SizeBytes { get; init; }
 
-    /// <summary>생성 시간.</summary>
+    /// <summary>생성 시각.</summary>
     public DateTimeOffset CreatedAt { get; init; }
 
-    /// <summary>수정 시간.</summary>
+    /// <summary>수정 시각.</summary>
     public DateTimeOffset ModifiedAt { get; init; }
 
-    /// <summary>ffprobe 로 추출한 상세 메타데이터. 분석 전에는 null.</summary>
-    public VideoMetadata? Metadata { get; set; }
+    /// <summary>컨테이너 추정(확장자 기반, 예: mp4/mov/mkv).</summary>
+    public string Container { get; init; } = string.Empty;
 }

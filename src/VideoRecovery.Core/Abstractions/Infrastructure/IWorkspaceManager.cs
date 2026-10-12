@@ -1,20 +1,17 @@
 namespace VideoRecovery.Core.Abstractions.Infrastructure;
 
 /// <summary>
-/// 복구 작업 영역 관리. 원본과 분리된 별도 영역에서 모든 작업을 수행한다. (요구사항 2.1)
-/// Original → Analysis → Recovery Workspace → Recovered Video
+/// 복구 작업 영역 관리자. 원본을 직접 수정하지 않고 격리된 세션 폴더에서
+/// 모든 복구/분석 산출물을 생성한다. 복구 실패 시 동일 원본으로 재시도할 수 있다.
 /// </summary>
 public interface IWorkspaceManager
 {
-    /// <summary>작업 영역 루트 경로.</summary>
-    string WorkspaceRoot { get; }
+    /// <summary>새 작업 세션 폴더를 생성하고 경로를 반환한다.</summary>
+    string CreateSession(string originalPath);
 
-    /// <summary>
-    /// 특정 원본 파일에 대한 격리된 작업 디렉터리를 생성/반환한다.
-    /// 복구 실패 시 재시도를 위해 세션 단위로 분리한다. (요구사항 2.1, 17-6)
-    /// </summary>
-    string CreateSessionDirectory(string sourceFilePath);
+    /// <summary>세션 내부의 결과물 경로를 조합한다.</summary>
+    string GetArtifactPath(string sessionPath, string fileName);
 
-    /// <summary>세션 작업 디렉터리를 정리한다.</summary>
-    void CleanupSession(string sessionDirectory);
+    /// <summary>세션을 정리(삭제)한다.</summary>
+    void CleanupSession(string sessionPath);
 }

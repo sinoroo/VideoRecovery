@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-using VideoRecovery.Core.Abstractions.Infrastructure;
 using VideoRecovery.Core.Abstractions.Recovery;
 using VideoRecovery.Core.Enums;
 using VideoRecovery.Core.Models;
@@ -7,40 +5,25 @@ using VideoRecovery.Core.Models;
 namespace VideoRecovery.Recovery;
 
 /// <summary>
-/// Level 3 — Cross-Video Recovery. 다른 정상 영상의 유사 프레임으로 손상 구간 복원. (요구사항 8 Level 3)
-/// TODO(Phase 4): reference 프레임 삽입/정렬 및 Confidence 산정 구현.
+/// Level 3 복구 — 다른 정상 영상에서 유사 프레임을 참조하여 손상 구간을 복원한다.
+/// Phase 4에서 FrameMatcher 결과를 사용해 reference 프레임을 삽입하는 로직을 구현한다.
 /// </summary>
 public sealed class CrossVideoRecovery : ICrossVideoRecovery
 {
-    private const CorruptionType Handled =
-        CorruptionType.CrossVideoContamination | CorruptionType.MissingFrame |
-        CorruptionType.CorruptedFrame;
-
-    private readonly IFFmpegService _ffmpeg;
-    private readonly ILogger<CrossVideoRecovery> _logger;
-
-    public CrossVideoRecovery(IFFmpegService ffmpeg, ILogger<CrossVideoRecovery> logger)
-    {
-        _ffmpeg = ffmpeg;
-        _logger = logger;
-    }
-
-    /// <inheritdoc />
     public RecoveryLevel Level => RecoveryLevel.CrossVideoRecovery;
 
-    /// <inheritdoc />
-    public bool CanHandle(CorruptionType corruption) => (corruption & Handled) != CorruptionType.None;
+    public bool CanHandle(CorruptionType types)
+        => types.HasFlag(CorruptionType.CrossVideoContamination)
+           || types.HasFlag(CorruptionType.CorruptedFrame)
+           || types.HasFlag(CorruptionType.MissingFrame);
 
-    /// <inheritdoc />
-    public Task<RecoveryResult> ExecuteAsync(
-        RecoveryStep step,
-        string sessionDirectory,
+    public Task<RecoveryResult> RecoverAsync(
+        string originalPath,
+        string sessionPath,
+        CorruptionReport corruption,
+        ReferenceCandidate? reference,
         CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation(
-            "Cross-video recovery requested in {Session} with reference {Reference}",
-            sessionDirectory, step.Reference?.FilePath);
-        throw new NotImplementedException(
-            "CrossVideoRecovery.ExecuteAsync: Cross-Video 복구를 Phase 4 에서 구현한다.");
-    }
+        // Phase 4: reference 영상에서 매칭 구간 프레임을 추출하여 손상 구간에 삽입.
+        => throw new NotImplementedException(
+            "Phase 4 — Cross-Video Recovery 미구현: reference 프레임 복원 로직을 추가해야 합니다.");
 }

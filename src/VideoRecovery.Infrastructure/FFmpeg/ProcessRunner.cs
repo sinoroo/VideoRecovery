@@ -1,30 +1,37 @@
 using System.Diagnostics;
 using System.Text;
-using Microsoft.Extensions.Logging;
 
 namespace VideoRecovery.Infrastructure.FFmpeg;
 
-/// <summary>
-/// 외부 CLI(ffmpeg/ffprobe) 실행 공통 헬퍼. 모든 외부 프로세스 호출을 이 계층에 격리한다.
-/// (요구사항 12, 17-9)
-/// </summary>
-internal sealed class ProcessRunner
+/// <summary>단일 외부 프로세스 실행 결과.</summary>
+public sealed class ProcessResult
 {
-    private readonly ILogger _logger;
+    /// <summary>종료 코드.</summary>
+    public int ExitCode { get; init; }
 
-    public ProcessRunner(ILogger logger) => _logger = logger;
+    /// <summary>표준 출력.</summary>
+    public string StandardOutput { get; init; } = string.Empty;
 
-    /// <summary>
-    /// 지정한 실행 파일을 인자와 함께 실행하고 (ExitCode, StdOut, StdErr) 를 반환한다.
-    /// 원본 파일은 인자로만 전달하며 절대 쓰기 모드로 열지 않는다. (요구사항 17-1)
-    /// </summary>
-    public async Task<ProcessResult> RunAsync(
+    /// <summary>표준 오류.</summary>
+    public string StandardError { get; init; } = string.Empty;
+
+    /// <summary>프로세스가 정상적으로 시작/종료되었는지 여부.</summary>
+    public bool Started { get; init; }
+}
+
+/// <summary>
+/// 외부 CLI(ffmpeg/ffprobe)를 호출하는 저수준 프로세스 러너.
+/// 바이너리가 설치되어 있지 않아도 예외로 죽지 않고 결과로 보고한다.
+/// </summary>
+public static class ProcessRunner
+{
+    /// <summary>프로세스를 실행하고 표준 출력/오류를 수집한다.</summary>
+    public static async Task<ProcessResult> RunAsync(
         string fileName,
         string arguments,
+        TimeSpan timeout,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Executing: {FileName} {Arguments}", fileName, arguments);
-
         var psi = new ProcessStartInfo
         {
             FileName = fileName,
@@ -33,24 +40,72 @@ internal sealed class ProcessRunner
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
         };
 
         using var process = new Process { StartInfo = psi };
+
         var stdout = new StringBuilder();
         var stderr = new StringBuilder();
-
         process.OutputDataReceived += (_, e) => { if (e.Data is not null) stdout.AppendLine(e.Data); };
         process.ErrorDataReceived += (_, e) => { if (e.Data is not null) stderr.AppendLine(e.Data); };
 
-        process.Start();
+        try
+        {
+            if (!process.Start())
+            {
+                return new ProcessResult { Started = false, ExitCode = -1 };
+            }
+        }
+        catch (Exception ex)
+        {
+            // 바이너리 미설치 등 — 호출자가 처리하도록 결과로 반환.
+            return new ProcessResult
+            {
+                Started = false,
+                ExitCode = -1,
+                StandardError = ex.Message
+            };
+        }
+
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
-        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(timeout);
 
-        return new ProcessResult(process.ExitCode, stdout.ToString(), stderr.ToString());
+        try
+        {
+            await process.WaitForExitAsync(timeoutCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            TryKill(process);
+            throw;
+        }
+
+        return new ProcessResult
+        {
+            Started = true,
+            ExitCode = process.ExitCode,
+            StandardOutput = stdout.ToString(),
+            StandardError = stderr.ToString()
+        };
+    }
+
+    private static void TryKill(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch
+        {
+            // 무시 — 정리 목적.
+        }
     }
 }
-
-/// <summary>프로세스 실행 결과.</summary>
-internal readonly record struct ProcessResult(int ExitCode, string StandardOutput, string StandardError);
