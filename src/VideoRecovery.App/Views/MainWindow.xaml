@@ -8,9 +8,6 @@
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
         Title="Video Recovery"
-        WindowState="Maximized"
-        WindowStyle="None"
-        ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         Background="{DynamicResource MaterialDesignPaper}"
@@ -39,16 +36,10 @@
                         <TextBlock Text="VIDEO RECOVERY"
                                    FontSize="22" FontWeight="Bold"
                                    Margin="12,0,0,0" VerticalAlignment="Center" />
-                        <TextBlock Text="영상 자동 진단 (Phase 1 MVP)"
+                        <TextBlock Text="영상 자동 진단 + 복구 (Phase 2)"
                                    FontSize="13" Opacity="0.8"
                                    Margin="16,0,0,0" VerticalAlignment="Center" />
                     </StackPanel>
-                    <Button DockPanel.Dock="Right"
-                            Content="EXIT"
-                            Command="{Binding ExitCommand}"
-                            Style="{StaticResource MaterialDesignFlatButton}"
-                            Foreground="White"
-                            AutomationProperties.AutomationId="ExitButton" />
                 </DockPanel>
             </materialDesign:ColorZone>
 
@@ -112,6 +103,28 @@
 
             <!-- Progress + status -->
             <StackPanel Grid.Row="2" Margin="16,0,16,8">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <Button Command="{Binding RecoverSelectedCommand}"
+                            Style="{StaticResource MaterialDesignRaisedButton}"
+                            Background="{DynamicResource PrimaryHueMidBrush}"
+                            BorderBrush="{DynamicResource PrimaryHueMidBrush}"
+                            AutomationProperties.AutomationId="RecoverSelectedButton">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Wrench" VerticalAlignment="Center" />
+                            <TextBlock Text="선택 복구" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding RecoverAllDamagedCommand}"
+                            Margin="8,0,0,0"
+                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                            AutomationProperties.AutomationId="RecoverAllButton">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="AutoFix" VerticalAlignment="Center" />
+                            <TextBlock Text="손상 전체 복구" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
                 <ProgressBar Minimum="0"
                              Maximum="{Binding ProgressMax}"
                              Value="{Binding ProgressValue}"
@@ -150,6 +163,7 @@
                             <DataGridTextColumn Header="복구 가능성" Binding="{Binding RecoveryProbabilityText}" Width="Auto" />
                             <DataGridTextColumn Header="추천 방법" Binding="{Binding RecommendedMethod}" Width="Auto" />
                             <DataGridTextColumn Header="Reference" Binding="{Binding ReferenceText}" Width="Auto" />
+                            <DataGridTextColumn Header="복구 상태" Binding="{Binding RecoveryStatus}" Width="Auto" />
                         </DataGrid.Columns>
                         <DataGrid.RowStyle>
                             <Style TargetType="DataGridRow">
@@ -193,6 +207,39 @@
 
                                 <TextBlock Text="요약" Opacity="0.6" Margin="0,8,0,0" />
                                 <TextBlock Text="{Binding SelectedRow.Summary}" TextWrapping="Wrap" />
+
+                                <TextBlock Text="복구 상태" Opacity="0.6" Margin="0,8,0,0" />
+                                <TextBlock Text="{Binding SelectedRow.RecoveryStatus}" FontWeight="Medium"
+                                           AutomationProperties.AutomationId="DetailRecoveryStatus" />
+
+                                <TextBlock Text="복구 결과물 경로" Opacity="0.6" Margin="0,8,0,0" />
+                                <TextBlock Text="{Binding SelectedRow.RecoveredPath}" TextWrapping="Wrap"
+                                           AutomationProperties.AutomationId="DetailRecoveredPath" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Command="{Binding SaveRecoveredCommand}"
+                                            Style="{StaticResource MaterialDesignRaisedButton}"
+                                            AutomationProperties.AutomationId="SaveRecoveredButton">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="ContentSave" VerticalAlignment="Center" />
+                                            <TextBlock Text="복구본 저장" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <Button Command="{Binding OpenRecoveredFolderCommand}"
+                                            Margin="8,0,0,0"
+                                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                                            ToolTip="탐색기에서 복구 결과물 보기"
+                                            AutomationProperties.AutomationId="OpenRecoveredFolderButton">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="FolderOpen" VerticalAlignment="Center" />
+                                            <TextBlock Text="폴더 열기" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+
+                                <TextBlock Text="복구 상세" Opacity="0.6" Margin="0,8,0,0" />
+                                <TextBlock Text="{Binding SelectedRow.RecoveryDetail}" TextWrapping="Wrap" />
                             </StackPanel>
 
                             <TextBlock Text="행을 선택하면 상세 정보가 표시됩니다."
@@ -208,7 +255,7 @@
                        Margin="16,0,16,12"
                        Opacity="0.5"
                        FontSize="12"
-                       Text="원본은 변경되지 않습니다. 모든 작업은 격리된 작업 영역에서 수행됩니다." />
+                       Text="원본은 변경되지 않습니다. 복구본은 작업 영역에 생성되며, [복구본 저장]으로 원하는 위치에 저장할 수 있습니다." />
         </Grid>
     </materialDesign:DialogHost>
 </Window>

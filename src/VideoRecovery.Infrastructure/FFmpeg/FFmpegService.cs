@@ -87,6 +87,28 @@ public sealed partial class FFmpegService : IFFmpegService
         return result.Started && result.ExitCode == 0 && File.Exists(outputPath);
     }
 
+    public async Task<bool> ReencodeDropCorruptAsync(
+        string inputPath, string outputPath, CancellationToken cancellationToken = default)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+
+        // 손상 패킷을 버리고(+discardcorrupt) 정상 프레임만 재디코딩 → 재인코딩.
+        // genpts로 타임스탬프를 재생성하여 제거된 프레임 구간의 간격을 메운다.
+        var args =
+            $"-v error -hide_banner -err_detect ignore_err " +
+            $"-fflags +discardcorrupt+genpts -i \"{inputPath}\" " +
+            $"-map 0:v:0? -map 0:a:0? " +
+            $"-c:v libx264 -preset veryfast -crf 20 " +
+            $"-c:a aac -b:a 160k " +
+            $"-fps_mode cfr -movflags +faststart -y \"{outputPath}\"";
+
+        var result = await ProcessRunner
+            .RunAsync(_options.FFmpegPath, args, _options.Timeout, cancellationToken)
+            .ConfigureAwait(false);
+
+        return result.Started && result.ExitCode == 0 && File.Exists(outputPath);
+    }
+
     /// <summary>ffmpeg stderr에서 디코드 오류 라인을 추출한다.</summary>
     private static IReadOnlyList<DecodeError> ParseDecodeErrors(string stderr)
     {

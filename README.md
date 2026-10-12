@@ -2,7 +2,7 @@
 
 AI 기반 영상 복구 프로그램. 오래되거나 손상된 영상 파일을 **분석 → 손상 탐지 → 다른 정상 영상과 비교 → 복구 전략 결정 → 복구 → 검증**까지 수행하는 것을 목표로 한다.
 
-> 현재 구현 수준: **Phase 1(MVP 진단)** 이 동작하는 전체 솔루션 스캐폴딩. 복구(Level 2+)·AI(Level 4)는 인터페이스/스텁으로 분리되어 있으며, 각 스텁의 예외 메시지에 담당 Phase가 명시되어 있다.
+> 현재 구현 수준: **Phase 2(기본 복구)** 동작. 진단(Phase 1)에 더해 Container/Index/Timestamp 복구와 Frame 복구(손상 패킷 제거 후 재인코딩)가 실제로 수행되며, `IRecoveryExecutor`가 계획에 따라 가장 안전한 레벨부터 복구를 시도하고 결과를 검증한다. Cross-Video(Level 3) 복구와 AI(Level 4)는 인터페이스/스텁으로 분리되어 있으며, 각 스텁의 예외 메시지에 담당 Phase가 명시되어 있다.
 
 ## 기술 스택
 
@@ -72,10 +72,20 @@ TimeoutMinutes=30
 | Phase | 내용 | 상태 |
 |-------|------|------|
 | 1 | 분석/진단 (스캔·메타데이터·디코드 테스트·손상 구간) | ✅ 동작 |
-| 2 | 기본 복구 (Container/Index/Timestamp, 프레임 추출/재인코딩) | 🟡 Container=동작, Frame=스텁 |
+| 2 | 기본 복구 (Container/Index/Timestamp, 프레임 제거/재인코딩) + Executor/Validator | ✅ 동작 |
 | 3 | Cross-Video 분석 (유사도/시간축/contamination) | 🟡 엔진 구현, 통합 확장 예정 |
 | 4 | Cross-Video 복구 | ⬜ 스텁(`NotImplementedException`) |
 | 5 | AI 복구 (보간/초해상/디노이즈) | ⬜ 추상화만 |
+
+## 테스트
+
+```powershell
+dotnet test tests/VideoRecovery.UnitTests/VideoRecovery.UnitTests.csproj   # xUnit + Moq + FluentAssertions
+dotnet test tests/VideoRecovery.UiTests/VideoRecovery.UiTests.csproj        # FlaUI(UIA3), 데스크톱 세션 필요
+```
+
+- **Unit**: `RecoveryPlanner`, `RecoveryExecutor`, `FrameRecovery`, `RecoveryValidator`, `MainViewModel`, `DiagnosisRowViewModel`.
+- **UI(FlaUI)**: 메인 윈도우 로드, 핵심 컨트롤 존재(AutomationId), 폴더 입력 시 분석 버튼 활성화, 복구 버튼 초기 비활성. 스크린샷은 `ui-artifacts/`에 저장.
 
 ## Harness Agent ↔ 인터페이스 매핑 (요구사항 16장)
 
@@ -92,6 +102,6 @@ TimeoutMinutes=30
 
 ## 다음 단계
 
-1. **Phase 2 Frame Recovery**: `FrameRecovery.RecoverAsync` — 디코드 오류 구간 제거 후 정상 프레임 재조립.
-2. **Phase 3 통합**: `FrameMatcher` 결과를 `DiagnosisPipeline`에 연결하여 `CrossVideoContamination` 자동 태깅.
+1. **Phase 3 통합**: `FrameMatcher` 결과를 `DiagnosisPipeline`에 연결하여 `CrossVideoContamination` 자동 태깅.
+2. **Phase 4 Cross-Video Recovery**: `CrossVideoRecovery.RecoverAsync` — reference 영상에서 매칭 구간 프레임을 추출하여 손상 구간에 삽입.
 3. **OpenCV 연동**: `FrameAnalyzer`/`FeatureMatcher`에 SSIM·히스토그램·feature 비교 추가.

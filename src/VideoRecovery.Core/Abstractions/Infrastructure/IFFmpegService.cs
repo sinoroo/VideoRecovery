@@ -37,4 +37,11 @@ public interface IFFmpegService
     /// </summary>
     Task<bool> RemuxAsync(
         string inputPath, string outputPath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 손상 패킷/프레임을 버리고 정상 프레임만 재디코딩·재인코딩하여 새 파일을 만든다.
+    /// 타임스탬프를 재정렬하며(Level 2 프레임 복구) 원본은 변경하지 않는다.
+    /// </summary>
+    Task<bool> ReencodeDropCorruptAsync(
+        string inputPath, string outputPath, CancellationToken cancellationToken = default);
 }

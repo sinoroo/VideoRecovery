@@ -97,6 +97,12 @@ public partial class App : Application
         services.AddSingleton<ICrossVideoRecovery, CrossVideoRecovery>();
         services.AddSingleton<IRecoveryValidator, RecoveryValidator>();
 
+        // 복구 전략을 공통 인터페이스로도 노출(Executor가 레벨별로 선택).
+        services.AddSingleton<IRecoveryStrategy>(sp => sp.GetRequiredService<IContainerRecovery>());
+        services.AddSingleton<IRecoveryStrategy>(sp => sp.GetRequiredService<IFrameRecovery>());
+        services.AddSingleton<IRecoveryStrategy>(sp => sp.GetRequiredService<ICrossVideoRecovery>());
+        services.AddSingleton<IRecoveryExecutor, RecoveryExecutor>();
+
         // AI (추상화만 — Phase 5에서 실제 모델 연결).
         services.AddSingleton<IAIInferenceEngine, NullAIInferenceEngine>();
         services.AddSingleton<IFrameInterpolation, FrameInterpolation>();
@@ -105,6 +111,7 @@ public partial class App : Application
 
         // App services.
         services.AddSingleton<IFolderPickerService, FolderPickerService>();
+        services.AddSingleton<IFileSaveService, FileSaveService>();
         services.AddSingleton<IDiagnosisPipeline, DiagnosisPipeline>();
 
         // ViewModels + Views.
